@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fff9f1">
+<meta name="description" content="مصحف لتعليم أخطاء الحفظ والتلاوة — الأخطاء تتحفظ على جهازك">
+<title>مصحف المراجعة</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<div id="app">
+  <header class="top">
+    <button class="ib" id="btnIndex" aria-label="الفهرس">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+    </button>
+    <button class="title" id="btnTitle" aria-label="انتقال">
+      <b id="tSura"></b><span id="tJuz"></span>
+    </button>
+    <button class="errbtn" id="btnErrors" aria-label="الأخطاء">
+      <span>الأخطاء</span><b id="errTotal">٠</b>
+    </button>
+  </header>
+
+  <main class="stage" id="stage">
+    <button class="nav r" id="prev" aria-label="الصفحة السابقة">&#8250;</button>
+    <button class="nav l" id="next" aria-label="الصفحة التالية">&#8249;</button>
+  </main>
+
+  <footer class="bottom">
+    <button class="ib" id="btnHide" aria-label="إخفاء الأخطاء" title="إخفاء الأخطاء للتسميع">
+      <svg viewBox="0 0 24 24" class="eye-on"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+      <svg viewBox="0 0 24 24" class="eye-off"><path d="M3 3l18 18M10.6 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+    </button>
+    <div class="pinfo">
+      <button class="pg" id="btnPage"><span id="pNum"></span></button>
+      <div class="dots" id="pDots"></div>
+    </div>
+    <button class="ib" id="btnSettings" aria-label="الإعدادات">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    </button>
+  </footer>
+</div>
+
+<!-- لوحة الكلمة: تظهر عند لمس كلمة -->
+<div class="scrim" id="scrim"></div>
+<section class="bsheet" id="wordSheet" aria-label="تعليم خطأ">
+  <div class="grab"></div>
+  <div class="ws-head">
+    <div class="ws-word" id="wsWord"></div>
+    <div class="ws-ref"><b id="wsRef"></b><span id="wsInfo"></span></div>
+  </div>
+  <div class="types" id="wsTypes"></div>
+  <div class="ws-existing" id="wsExisting">
+    <div class="stepper">
+      <span>تكرر الخطأ</span>
+      <button id="wsMinus" aria-label="أقل">−</button>
+      <b id="wsCount">١</b>
+      <button id="wsPlus" aria-label="أكثر">+</button>
+    </div>
+    <button class="danger" id="wsDelete">إزالة الخطأ</button>
+  </div>
+</section>
+
+<!-- الفهرس -->
+<section class="panel" id="panelIndex" aria-label="الفهرس">
+  <div class="phead">
+    <button class="ib back" data-close aria-label="رجوع"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    <h2>الفهرس</h2>
+  </div>
+  <div class="pbody">
+    <div class="jump">
+      <input id="jumpInput" type="number" inputmode="numeric" min="1" max="604" placeholder="رقم الصفحة (١–٦٠٤)">
+      <button id="jumpGo">اذهب</button>
+    </div>
+    <div class="tabs" id="idxTabs">
+      <button data-tab="suras" class="on">السور</button>
+      <button data-tab="juz">الأجزاء</button>
+    </div>
+    <input class="search" id="suraSearch" type="search" placeholder="ابحث عن سورة">
+    <div class="list" id="idxList"></div>
+  </div>
+</section>
+
+<!-- الأخطاء -->
+<section class="panel" id="panelErrors" aria-label="الأخطاء">
+  <div class="phead">
+    <button class="ib back" data-close aria-label="رجوع"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    <h2>الأخطاء المحفوظة</h2>
+  </div>
+  <div class="pbody">
+    <div class="stats" id="errStats"></div>
+    <div class="chips" id="errFilter"></div>
+    <div class="sortrow">
+      <label>الترتيب
+        <select id="errSort">
+          <option value="mushaf">حسب ترتيب المصحف</option>
+          <option value="count">الأكثر تكرارًا</option>
+          <option value="recent">الأحدث</option>
+        </select>
+      </label>
+    </div>
+    <div class="list" id="errList"></div>
+  </div>
+</section>
+
+<!-- الإعدادات -->
+<section class="panel" id="panelSettings" aria-label="الإعدادات">
+  <div class="phead">
+    <button class="ib back" data-close aria-label="رجوع"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    <h2>الإعدادات</h2>
+  </div>
+  <div class="pbody">
+    <div class="card">
+      <h3>طريقة التعليم</h3>
+      <label class="toggle"><input type="checkbox" id="setQuick"><span>تعليم سريع: لمسة واحدة تعلّم الكلمة بالنوع الافتراضي</span></label>
+      <label class="field">النوع الافتراضي
+        <select id="setDefault"></select>
+      </label>
+      <p class="note">في التعليم السريع، لمس كلمة معلّمة بيفتح لوحة تغيير النوع أو الإزالة.</p>
+    </div>
+
+    <div class="card">
+      <h3>الحفظ على الجهاز</h3>
+      <p class="note" id="persistInfo"></p>
+      <div class="btnrow">
+        <button id="btnExport">تصدير نسخة احتياطية</button>
+        <button id="btnImport">استيراد نسخة</button>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <p class="note">الأخطاء محفوظة على الجهاز ده بس. لو هتغيّر الموبايل أو تمسح بيانات المتصفح، صدّر نسخة احتياطية الأول.</p>
+    </div>
+
+    <div class="card">
+      <h3>العمل بدون إنترنت</h3>
+      <p class="note" id="offlineInfo">الصفحات اللي فتحتها قبل كده بتشتغل بدون نت. حمّل المصحف كامل (حوالي ٤٠ ميجا) عشان كل الصفحات تشتغل.</p>
+      <div class="progress" id="dlProg" hidden><i></i></div>
+      <button id="btnDownload">تحميل المصحف كاملًا</button>
+    </div>
+
+    <div class="card" id="installCard" hidden>
+      <h3>تثبيت التطبيق</h3>
+      <p class="note">أضف المصحف للشاشة الرئيسية ويفتح زي أي تطبيق.</p>
+      <button id="btnInstall">تثبيت</button>
+    </div>
+
+    <div class="card">
+      <h3>مسح كل الأخطاء</h3>
+      <p class="note">لا يمكن التراجع عن هذا. صدّر نسخة احتياطية قبلها لو محتاجها.</p>
+      <button class="danger" id="btnClear">مسح كل الأخطاء</button>
+    </div>
+    <p class="ver">مصحف المراجعة · الإصدار ١٫٠</p>
+  </div>
+</section>
+
+<div class="snack" id="snack"><span id="snackText"></span><button id="snackUndo">تراجع</button></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
