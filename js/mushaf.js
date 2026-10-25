@@ -125,7 +125,9 @@ function fit(sheet, stage) {
       if (w * k > W) k = W / w;
       s.style.transform = 'scaleX(' + k.toFixed(3) + ')';
     });
-    if (bs) bs.style.fontSize = (sz * 0.95) + 'px';
+    if (bs) { bs.style.fontSize = (sz * 0.95) + 'px'; bs.style.lineHeight = (sz * 2.0) + 'px'; }
+    // اسم السورة بيتصغّر مع الصفحة عشان مايركبش على البسملة في الشاشات القصيرة
+    sheet.querySelectorAll('.hdr span').forEach(h => { h.style.fontSize = Math.min(22, sz * 0.75) + 'px'; });
     lines.forEach(l => { l.style.height = (sz * 2.0) + 'px'; });
   };
   apply(size);
