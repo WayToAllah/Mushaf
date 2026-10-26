@@ -50,7 +50,7 @@ export function prefetch(p) {
  * يرسم الصفحة p جوه sheet.
  * classFor(id) → اسم الكلاس الإضافي للكلمة (لون نوع الخطأ) أو ''.
  */
-export async function renderPage(sheet, stage, p, classFor) {
+export async function renderPage(sheet, stage, p, classFor, opts = {}) {
   const rows = await loadPage(p);
   await ensureFontsFor(p);
   const lineRows = rows.filter(l => l.t !== 'h' && l.t !== 'b');
@@ -65,6 +65,20 @@ export async function renderPage(sheet, stage, p, classFor) {
   sheet.querySelectorAll('.seg').forEach((s, i) => { s._w = lineRows[i].w || []; s._last = last; s._cls = classFor; });
   await document.fonts.ready;
   fit(sheet, stage);
+  // علامة الربع ۞ في الهامش جنب السطر اللي بيبدأ فيه الربع
+  const lns = sheet.querySelectorAll('.ln');
+  (opts.quarters || []).forEach(q => {
+    const i = lineRows.findIndex(l => (l.w || []).some(w => w.k === q.key && w.p === 1));
+    if (i < 0 || !lns[i]) return;
+    const m = document.createElement('div');
+    m.className = 'rub' + (q.hizb ? ' hizb' : '');
+    m.title = q.title;
+    m.innerHTML = '<b>۞</b><span>' + q.label + '</span>';
+    lns[i].appendChild(m);
+    // نعلّم أول كلمة في الربع بخط خفيف تحتها
+    const first = lns[i].querySelector('.w[data-id="' + q.key + ':1"]');
+    if (first) first.classList.add('rq');
+  });
 }
 
 function setWords(s, loose) {
@@ -81,15 +95,15 @@ function setWords(s, loose) {
 export function repaint(sheet) {
   sheet.querySelectorAll('.w').forEach(el => {
     const s = el.closest('.seg');
-    el.className = 'w' + (s && s._cls(el.dataset.id) ? ' ' + s._cls(el.dataset.id) : '');
+    const c = s && s._cls(el.dataset.id);
+    el.className = 'w' + (c ? ' ' + c : '') + (el.classList.contains('rq') ? ' rq' : '') + (el.classList.contains('sel') ? ' sel' : '');
   });
 }
 
 function fit(sheet, stage) {
-  const pad = 8;
-  const W = sheet.clientWidth - pad * 2;
   const lines = [...sheet.querySelectorAll('.ln')];
   if (!lines.length) return;
+  const W = lines[0].clientWidth;
   const segs = [...sheet.querySelectorAll('.seg')];
   const BASE = 40;
   segs.forEach(s => { s.style.transform = 'none'; s.style.width = 'auto'; s.style.textAlign = 'right'; s.style.textAlignLast = 'auto'; setWords(s, false); s.style.fontSize = BASE + 'px'; });

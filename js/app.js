@@ -1,4 +1,4 @@
-import { SURAS, PAGES, JUZ_NAME, JUZ_PAGE, juzOfPage, suraPage, surasOnPage, suraName, pageOfAyah, AR } from './quran.js';
+import { SURAS, PAGES, JUZ_NAME, JUZ_PAGE, juzOfPage, suraPage, surasOnPage, suraName, pageOfAyah, AR, QUARTERS, QUARTER_FRAC, QUARTER_NAME, quarterPage, quartersOnPage, quarterAtPage } from './quran.js';
 import * as S from './store.js';
 import { renderPage, repaint, prefetch, loadFontMap, loadFont, fontUrl } from './mushaf.js';
 
@@ -33,7 +33,12 @@ async function show(p, dir = 0, focusId = null) {
   if (dir) sheet.style.transform = `translateX(${dir > 0 ? -50 : 50}px)`;
   stage.prepend(sheet);
   try {
-    await renderPage(sheet, stage, p, classFor);
+    const quarters = quartersOnPage(p).map(i => {
+      const [s, a] = QUARTERS[i], h = Math.floor(i / 4) + 1, part = i % 4;
+      return { key: s + ':' + a, hizb: part === 0, label: part === 0 ? AR(h) : QUARTER_FRAC[part],
+        title: part === 0 ? 'بداية الحزب ' + AR(h) : QUARTER_NAME[part] + ' الحزب ' + AR(h) };
+    });
+    await renderPage(sheet, stage, p, classFor, { quarters });
     if (tok !== renderTok) return;
     requestAnimationFrame(() => { sheet.style.opacity = '1'; sheet.style.transform = ''; });
     if (focusId) {
@@ -55,7 +60,8 @@ async function show(p, dir = 0, focusId = null) {
 function chrome() {
   const names = surasOnPage(page).map(suraName);
   $('#tSura').textContent = 'سورة ' + names.join(' · ');
-  $('#tJuz').textContent = 'الجزء ' + JUZ_NAME[juzOfPage(page) - 1];
+  const q = quarterAtPage(page), part = q % 4;
+  $('#tJuz').textContent = 'الجزء ' + JUZ_NAME[juzOfPage(page) - 1] + ' · ' + (part ? QUARTER_NAME[part] + ' ' : '') + 'الحزب ' + AR(Math.floor(q / 4) + 1);
   $('#pNum').textContent = AR(page);
   $('#prev').style.visibility = page > 1 ? '' : 'hidden';
   $('#next').style.visibility = page < PAGES ? '' : 'hidden';
@@ -295,6 +301,21 @@ function renderIndex() {
         ${by[x.i] ? `<span class="cnt">${AR(by[x.i])} خطأ</span>` : ''}
         <span class="pgno">ص ${AR(suraPage(x.i))}</span></button>`).join('')
       || '<div class="empty">مفيش سورة بالاسم ده</div>';
+  } else if (idxTab === 'hizb') {
+    let html = '';
+    QUARTERS.forEach(([s, a], i) => {
+      const h = Math.floor(i / 4) + 1, part = i % 4, p = quarterPage(i);
+      if (part === 0) html += `<div class="grp">الحزب ${AR(h)}${h % 2 ? ' · الجزء ' + JUZ_NAME[(h - 1) / 2] : ''}</div>`;
+      const next = QUARTERS[i + 1];
+      const end = next ? quarterPage(i + 1) - (pageOfAyah(next[0], next[1]) === p ? 0 : 1) : PAGES;
+      let n = 0; S.marks.forEach(m => { const [ms, ma] = m.id.split(':').map(Number); const k = ms * 1000 + ma; if (k >= s * 1000 + a && (!next || k < next[0] * 1000 + next[1])) n++; });
+      html += `<button class="row" data-p="${p}">
+        <span class="num rubnum">${part === 0 ? '۞' : QUARTER_FRAC[part]}</span>
+        <span class="mid"><b>${part === 0 ? 'أول الحزب ' + AR(h) : QUARTER_NAME[part] + ' الحزب ' + AR(h)}</b><span>سورة ${suraName(s)} · آية ${AR(a)}</span></span>
+        ${n ? `<span class="cnt">${AR(n)} خطأ</span>` : ''}
+        <span class="pgno">ص ${AR(p)}</span></button>`;
+    });
+    list.innerHTML = html;
   } else {
     list.innerHTML = JUZ_PAGE.map((p, i) => {
       const end = i < 29 ? JUZ_PAGE[i + 1] - 1 : PAGES;

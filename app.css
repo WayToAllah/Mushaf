@@ -33,7 +33,7 @@ body.hide #btnHide{color:var(--accent);background:#e3f1ec}
 
 /* صفحة المصحف */
 .stage{flex:1;position:relative;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;touch-action:pan-y}
-.sheet{width:100%;max-width:560px;padding:4px 10px 6px;direction:rtl;transition:transform .18s ease,opacity .18s ease}
+.sheet{width:100%;max-width:560px;padding:4px 20px 6px 6px;direction:rtl;transition:transform .18s ease,opacity .18s ease}
 .stage.drag .sheet{transition:none}
 .ln{position:relative;white-space:nowrap;color:#1a1a1a}
 .seg{position:absolute;top:0;white-space:nowrap;transform-origin:right center;direction:rtl;unicode-bidi:bidi-override}
@@ -131,3 +131,12 @@ input,select{font-family:inherit;font-size:16px;height:44px;padding:0 12px;borde
 .snack.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
 .snack button{border:0;background:transparent;color:#ffd9a0;font-size:14px;font-weight:600;padding:4px 8px}
 .snack button[hidden]{display:none}
+
+/* علامات الأرباع */
+.rub{position:absolute;right:-19px;width:17px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;line-height:1;color:var(--gold);pointer-events:none;z-index:1}
+.rub b{font-size:15px;font-weight:400}
+.rub span{font-size:9px;font-weight:600;margin-top:1px}
+.rub.hizb b{color:var(--accent)}
+.rub.hizb span{color:var(--accent)}
+.w.rq{box-shadow:inset 0 -2px 0 rgba(169,135,97,.55)}
+.rubnum{font-size:15px}
