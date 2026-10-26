@@ -29,8 +29,7 @@ async function show(p, dir = 0, focusId = null) {
   stage.querySelectorAll('.sheet,.miss').forEach(e => e.remove());
   const sheet = document.createElement('div');
   const archStyle = (S.meta.rubStyle || 'arch') === 'arch';
-  // الصفحات الفردية يمين والزوجية شمال، فالعلامة دايمًا في الهامش الخارجي
-  sheet.className = 'sheet' + (archStyle ? ' mk-arch ' + (p % 2 ? 'is-right' : 'is-left') : '');
+  sheet.className = 'sheet';
   sheet.style.opacity = '0';
   if (dir) sheet.style.transform = `translateX(${dir > 0 ? -50 : 50}px)`;
   stage.prepend(sheet);

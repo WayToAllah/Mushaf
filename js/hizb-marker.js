@@ -41,3 +41,21 @@ export function inlineStar() {
   <circle cx="50" cy="50" r="9" fill="${C.gold}"/></svg>`;
   return tpl.content.firstElementChild;
 }
+
+// نسخة مدمجة لنفس التصميم بعرض الهامش القديم (~١٨ بكسل):
+// الحلقة بالأربع أجزاء + رقم الحزب في النص، من غير القوس والكلام.
+export function createCompact(hizb, quarter) {
+  const num = AR(hizb);
+  const seg = i => (i <= quarter ? C.gold : C.track);
+  const label = quarter === 4 ? `بداية الحزب ${num}` : `${WORDS[quarter]} الحزب ${num}`;
+  const tpl = document.createElement('template');
+  tpl.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="hizb-compact" viewBox="0 0 100 100" role="img" aria-label="${label}">
+  <title>${label}</title>
+  <circle cx="50" cy="50" r="41" fill="${C.bg}"/>
+  <g transform="rotate(-84.6 50 50)" fill="none" stroke-width="10" stroke-linecap="round">
+    ${[0, 1, 2, 3].map(k => `<circle cx="50" cy="50" r="41" pathLength="100" stroke-dasharray="22 78" stroke-dashoffset="${-25 * k}" stroke="${seg(k + 1)}"/>`).join('')}
+  </g>
+  <text x="50" y="${hizb > 9 ? 66 : 68}" text-anchor="middle" font-family="Amiri, serif" font-size="${hizb > 9 ? 44 : 52}" font-weight="700" fill="${C.ink}">${num}</text>
+</svg>`;
+  return tpl.content.firstElementChild;
+}

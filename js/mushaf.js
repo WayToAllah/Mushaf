@@ -1,7 +1,7 @@
 // رسم صفحة المصحف بخط QCF4: كل كلمة حرف واحد في خط الصفحة.
 // منطق الضبط (fit) منقول كما هو من /mushaf/ في تطبيق الحلقة.
 
-import { createMarker, inlineStar, RING_CENTER } from './hizb-marker.js';
+import { createCompact, inlineStar } from './hizb-marker.js';
 
 const SRC_W = 1024, MAXK = 1.12;
 let FONTMAP = null;
@@ -73,11 +73,9 @@ export async function renderPage(sheet, stage, p, classFor, opts = {}) {
     const i = lineRows.findIndex(l => (l.w || []).some(w => w.k === q.key && w.p === 1));
     if (i < 0 || !lns[i]) return;
     if (opts.style === 'arch') {
-      // التصميم الكامل: القوس في الهامش الخارجي، ومركز الحلقة على مستوى السطر
-      const mk = createMarker(q.h, q.part === 0 ? 4 : q.part);
-      const mw = parseFloat(getComputedStyle(sheet).getPropertyValue('--marker-width')) || 44;
-      mk.style.top = (lns[i].offsetTop + lns[i].offsetHeight / 2 - mw * RING_CENTER) + 'px';
-      sheet.appendChild(mk);
+      // نفس تصميم القوس بس مدمج في الهامش القديم: الحلقة + رقم الحزب
+      const mk = createCompact(q.h, q.part === 0 ? 4 : q.part);
+      lns[i].appendChild(mk);
       const first = lns[i].querySelector('.w[data-id="' + q.key + ':1"]');
       if (first) {
         const st = inlineStar(), lr = lns[i].getBoundingClientRect(), wr = first.getBoundingClientRect();
