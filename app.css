@@ -140,3 +140,15 @@ input,select{font-family:inherit;font-size:16px;height:44px;padding:0 12px;borde
 .rub.hizb span{color:var(--accent)}
 .w.rq{box-shadow:inset 0 -2px 0 rgba(169,135,97,.55)}
 .rubnum{font-size:15px}
+
+/* علامة الربع — التصميم الكامل (القوس) */
+@font-face{font-family:Amiri;font-weight:400;font-display:swap;src:url(fonts/amiri/amiri-arabic-400-normal.woff2) format('woff2')}
+@font-face{font-family:Amiri;font-weight:700;font-display:swap;src:url(fonts/amiri/amiri-arabic-700-normal.woff2) format('woff2')}
+.sheet.mk-arch{position:relative;--marker-width:60px;--margin-gap:8px}
+.sheet.mk-arch.is-right{padding-right:calc(var(--marker-width) + var(--margin-gap) * 2);padding-left:6px}
+.sheet.mk-arch.is-left{padding-left:calc(var(--marker-width) + var(--margin-gap) * 2);padding-right:6px}
+@media (max-width:600px){.sheet.mk-arch{--marker-width:44px;--margin-gap:6px}}
+.sheet svg.hizb-marker{position:absolute;width:var(--marker-width);height:auto;aspect-ratio:164/232;pointer-events:none;stroke:none;fill:initial}
+.sheet.is-right svg.hizb-marker{right:var(--margin-gap)}
+.sheet.is-left svg.hizb-marker{left:var(--margin-gap)}
+.ln svg.hizb-inline-star{position:absolute;pointer-events:none;z-index:1}

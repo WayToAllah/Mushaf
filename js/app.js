@@ -28,17 +28,19 @@ async function show(p, dir = 0, focusId = null) {
   const tok = ++renderTok;
   stage.querySelectorAll('.sheet,.miss').forEach(e => e.remove());
   const sheet = document.createElement('div');
-  sheet.className = 'sheet';
+  const archStyle = (S.meta.rubStyle || 'arch') === 'arch';
+  // الصفحات الفردية يمين والزوجية شمال، فالعلامة دايمًا في الهامش الخارجي
+  sheet.className = 'sheet' + (archStyle ? ' mk-arch ' + (p % 2 ? 'is-right' : 'is-left') : '');
   sheet.style.opacity = '0';
   if (dir) sheet.style.transform = `translateX(${dir > 0 ? -50 : 50}px)`;
   stage.prepend(sheet);
   try {
     const quarters = quartersOnPage(p).map(i => {
       const [s, a] = QUARTERS[i], h = Math.floor(i / 4) + 1, part = i % 4;
-      return { key: s + ':' + a, hizb: part === 0, label: part === 0 ? AR(h) : QUARTER_FRAC[part],
+      return { key: s + ':' + a, h, part, hizb: part === 0, label: part === 0 ? AR(h) : QUARTER_FRAC[part],
         title: part === 0 ? 'بداية الحزب ' + AR(h) : QUARTER_NAME[part] + ' الحزب ' + AR(h) };
     });
-    await renderPage(sheet, stage, p, classFor, { quarters });
+    await renderPage(sheet, stage, p, classFor, { quarters, style: archStyle ? 'arch' : 'simple' });
     if (tok !== renderTok) return;
     requestAnimationFrame(() => { sheet.style.opacity = '1'; sheet.style.transform = ''; });
     if (focusId) {
@@ -392,10 +394,12 @@ $('#btnSettings').onclick = () => { renderSettings(); openLayer('#panelSettings'
 $('#setDefault').innerHTML = TYPES.map(t => `<option value="${t.key}">${t.name}</option>`).join('');
 $('#setQuick').onchange = e => S.setMeta('quick', e.target.checked);
 $('#setDefault').onchange = e => S.setMeta('defType', e.target.value);
+$('#setRub').onchange = e => { S.setMeta('rubStyle', e.target.value); show(page); };
 
 async function renderSettings() {
   $('#setQuick').checked = !!S.meta.quick;
   $('#setDefault').value = S.meta.defType || 'hifz';
+  $('#setRub').value = S.meta.rubStyle || 'arch';
   const persisted = await S.isPersisted();
   const n = S.marks.size;
   const last = S.meta.lastBackup ? new Date(S.meta.lastBackup).toLocaleDateString('ar-EG') : null;
