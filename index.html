@@ -64,6 +64,16 @@
     </div>
     <button class="danger" id="wsDelete">إزالة الخطأ</button>
   </div>
+  <div class="ws-tafsir" id="wsTafsir">
+    <button class="ws-tf-toggle" id="wsTfToggle" aria-expanded="false" aria-controls="wsTfBody">
+      <span>تفسير الآية</span><small>المختصر في التفسير</small>
+      <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="ws-tf-body" id="wsTfBody">
+      <p class="ws-tf-text" id="wsTfText"></p>
+      <p class="ws-tf-src">المختصر في التفسير — مركز تفسير للدراسات القرآنية · المصدر: QuranEnc.com</p>
+    </div>
+  </div>
 </section>
 
 <!-- الفهرس -->
@@ -148,7 +158,7 @@
 
     <div class="card">
       <h3>العمل بدون إنترنت</h3>
-      <p class="note" id="offlineInfo">الصفحات اللي فتحتها قبل كده بتشتغل بدون نت. حمّل المصحف كامل (حوالي ٤٠ ميجا) عشان كل الصفحات تشتغل.</p>
+      <p class="note" id="offlineInfo">الصفحات اللي فتحتها قبل كده بتشتغل بدون نت. حمّل المصحف كامل مع التفسير (حوالي ٤٠ ميجا) عشان كل الصفحات تشتغل.</p>
       <div class="progress" id="dlProg" hidden><i></i></div>
       <button id="btnDownload">تحميل المصحف كاملًا</button>
     </div>

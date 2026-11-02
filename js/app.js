@@ -149,8 +149,43 @@ function openWord(ctx) {
   ww.textContent = ctx.glyph;
   ww.style.fontFamily = ctx.font;
   paintSheet();
+  paintTafsir();
   openLayer('#wordSheet');
 }
+
+// ---------------- التفسير (المختصر) ----------------
+// ملف لكل صفحة: data/tafsir/mukhtasar/<page>.json = {"سورة:آية": "نص"}
+const tafsirCache = new Map();
+function tafsirOf(p) {
+  if (!tafsirCache.has(p)) {
+    tafsirCache.set(p, fetch(`data/tafsir/mukhtasar/${p}.json`)
+      .then(r => { if (!r.ok) throw 0; return r.json(); })
+      .catch(e => { tafsirCache.delete(p); throw e; }));
+  }
+  return tafsirCache.get(p);
+}
+async function paintTafsir() {
+  const box = $('#wsTafsir'), txt = $('#wsTfText');
+  const open = !!S.meta.tafsirOpen;
+  box.classList.toggle('on', open);
+  $('#wsTfToggle').setAttribute('aria-expanded', open);
+  if (!open || !cur) return;
+  const { s, a } = parseId(cur.id), key = s + ':' + a, id = cur.id;
+  txt.className = 'ws-tf-text dim';
+  txt.textContent = 'جاري التحميل…';
+  try {
+    let t = (await tafsirOf(page))[key];
+    if (!t) t = (await tafsirOf(pageOfAyah(s, a)))[key];
+    if (!cur || cur.id !== id) return;
+    txt.className = 'ws-tf-text';
+    txt.textContent = t || 'مفيش تفسير للآية دي.';
+  } catch (_) {
+    if (!cur || cur.id !== id) return;
+    txt.textContent = 'التفسير مش متحمّل على الجهاز — افتح النت مرة، أو حمّل المصحف كامل من الإعدادات.';
+  }
+  $('#wsTfBody').scrollTop = 0;
+}
+$('#wsTfToggle').onclick = () => { S.setMeta('tafsirOpen', !S.meta.tafsirOpen); paintTafsir(); };
 
 function paintSheet() {
   const m = S.marks.get(cur.id);
@@ -407,7 +442,7 @@ async function renderSettings() {
     (S.storageMode() === 'ls' ? ' (تخزين احتياطي — المتصفح ده مش بيدعم IndexedDB)' : '') + '.<br>' +
     (persisted ? 'المتصفح موافق على الحفظ الدائم ✓' : 'المتصفح لسه ماأكدش الحفظ الدائم — تثبيت التطبيق على الشاشة الرئيسية بيساعد.') +
     (last ? '<br>آخر نسخة احتياطية: ' + last : '');
-  if (S.meta.offlineDone) $('#offlineInfo').textContent = 'المصحف كامل متحمّل على الجهاز ✓ — كل الصفحات بتشتغل بدون إنترنت.';
+  if (S.meta.offlineDone === 2) $('#offlineInfo').textContent = 'المصحف كامل والتفسير متحمّلين على الجهاز ✓ — كل الصفحات بتشتغل بدون إنترنت.';
 }
 
 $('#btnExport').onclick = async () => {
@@ -455,7 +490,7 @@ $('#btnDownload').onclick = async () => {
   try {
     const fm = await loadFontMap();
     const urls = [...Object.keys(fm.fonts).map(fontUrl)];
-    for (let p = 1; p <= PAGES; p++) urls.push(`data/${p}.json`);
+    for (let p = 1; p <= PAGES; p++) urls.push(`data/${p}.json`, `data/tafsir/mukhtasar/${p}.json`);
     const cache = await caches.open('mushaf-data-v1');
     let done = 0, fail = 0, i = 0;
     const step = () => { done++; bar.firstElementChild.style.width = (done / urls.length * 100).toFixed(1) + '%'; btn.textContent = 'جاري التحميل ' + AR(Math.round(done / urls.length * 100)) + '٪'; };
@@ -468,7 +503,7 @@ $('#btnDownload').onclick = async () => {
     };
     await Promise.all(Array.from({ length: 6 }, worker));
     if (fail) { toast('اتحمّل الأغلب، و' + AR(fail) + ' ملف فشل — جرّب تاني'); btn.textContent = 'كمّل التحميل'; }
-    else { S.setMeta('offlineDone', true); btn.textContent = 'اتحمّل المصحف كامل ✓'; renderSettings(); S.requestPersist(); }
+    else { S.setMeta('offlineDone', 2); btn.textContent = 'اتحمّل المصحف كامل ✓'; renderSettings(); S.requestPersist(); }
   } catch (_) { toast('التحميل فشل — اتأكد من الإنترنت'); btn.textContent = 'تحميل المصحف كاملًا'; }
   btn.disabled = false;
 };
