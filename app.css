@@ -21,6 +21,10 @@ svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke
 .title span{display:block;font-size:12px;color:var(--muted)}
 .errbtn{display:flex;align-items:center;gap:6px;height:36px;padding:0 12px;border-radius:18px;border:1px solid #f0c9c9;background:#fdf1f1;color:#8a2a2a;font-size:13px;flex:0 0 auto}
 .errbtn b{min-width:20px;font-size:14px}
+.trackbtn{display:flex;align-items:center;gap:4px;height:36px;padding:0 10px 0 8px;border-radius:18px;border:1px solid var(--line2);background:#fff;color:var(--muted);font-size:13px;flex:0 0 auto;max-width:34vw}
+.trackbtn svg{width:18px;height:18px;flex:0 0 auto}
+.trackbtn span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trackbtn.marked svg{fill:var(--gold);stroke:var(--gold)}
 .pinfo{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
 .pg{border:0;background:transparent;font-size:15px;font-weight:600;color:var(--gold);padding:2px 14px}
 .dots{display:flex;gap:6px;min-height:8px;font-size:11px;color:var(--muted);align-items:center}
@@ -73,17 +77,32 @@ body.hide .w[class*="m-"]{color:inherit;background:transparent}
 .types button.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 9%,#fff)}
 .ws-existing{display:none;align-items:center;justify-content:space-between;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .ws-existing.on{display:flex}
-/* تفسير الآية */
-.ws-tafsir{margin-top:12px;border-top:1px solid var(--line);padding-top:4px}
-.ws-tf-toggle{width:100%;display:flex;align-items:center;gap:8px;height:42px;padding:0 2px;border:0;background:none;color:var(--accent);font-size:15px;font-weight:600;text-align:right}
-.ws-tf-toggle small{font-size:11.5px;font-weight:400;color:var(--muted)}
-.ws-tf-toggle svg{margin-right:auto;width:18px;height:18px;transition:transform .2s}
-.ws-tafsir.on .ws-tf-toggle svg{transform:rotate(180deg)}
-.ws-tf-body{display:none;max-height:38vh;overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 4px}
-.ws-tafsir.on .ws-tf-body{display:block}
+/* دراسة الآية: التفسير / معاني الكلمات / المتشابهات */
+.ws-study{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.ws-tabs{display:flex;gap:6px}
+.ws-tabs button{flex:1;height:36px;border-radius:18px;border:1px solid var(--line2);background:#fff;color:var(--muted);font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:5px;padding:0 6px;white-space:nowrap}
+.ws-tabs button.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,#fff);color:var(--accent);font-weight:600}
+.ws-tabs i{font-style:normal;font-size:11px;min-width:18px;height:18px;line-height:18px;border-radius:9px;background:var(--line);color:var(--ink);padding:0 5px}
+.ws-tabs i:empty{display:none}
+.ws-body{display:none;max-height:40vh;overflow-y:auto;overscroll-behavior:contain;padding:10px 2px 2px}
+.ws-study.on .ws-body{display:block}
 .ws-tf-text{margin:0;font-family:Amiri,serif;font-size:17px;line-height:1.95;color:var(--ink)}
-.ws-tf-text.dim{font-family:inherit;font-size:13.5px;color:var(--muted)}
+.dim{font-size:13.5px;color:var(--muted);line-height:1.8;margin:0}
 .ws-tf-src{margin:10px 0 0;font-size:11px;color:var(--muted)}
+.gh{padding:8px 0;border-bottom:1px solid var(--line);font-family:Amiri,serif;font-size:16.5px;line-height:1.85}
+.gh:last-of-type{border-bottom:0}
+.gh b{color:var(--accent);margin-left:6px}
+.gh b::after{content:':'}
+.gh.cur{background:color-mix(in srgb,var(--gold) 12%,transparent);border-radius:10px;padding:8px 10px;border-bottom:0;margin-bottom:4px}
+.gh.cur::before{content:'الكلمة دي';display:block;font-family:system-ui,sans-serif;font-size:11px;color:var(--gold);font-weight:600}
+.ayah{font-family:Amiri,serif;font-size:17.5px;line-height:2;color:var(--ink)}
+.ayah mark{background:none;color:#b3261e;font-weight:700;text-decoration:underline 1.5px;text-underline-offset:6px}
+.ayah .ctx{color:var(--muted)}
+.mut-src{padding:8px 10px;border-radius:10px;background:var(--paper);border:1px solid var(--line);margin-bottom:8px}
+.mut{display:block;width:100%;text-align:right;border:0;border-bottom:1px solid var(--line);background:none;padding:8px 2px;color:var(--ink)}
+.mut:last-of-type{border-bottom:0}
+.mut small,.mut-src small{display:block;font-size:12px;color:var(--muted)}
+.mut small b{color:var(--accent);font-weight:600}
 .stepper{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 .stepper button{width:34px;height:34px;border-radius:50%;border:1px solid var(--line2);background:#fff;font-size:18px;color:var(--ink)}
 .stepper b{min-width:22px;text-align:center;font-size:16px;color:var(--ink)}
@@ -157,3 +176,28 @@ input,select{font-family:inherit;font-size:16px;height:44px;padding:0 12px;borde
 @font-face{font-family:Amiri;font-weight:700;font-display:swap;src:url(fonts/amiri/amiri-arabic-700-normal.woff2) format('woff2')}
 .ln svg.hizb-compact{position:absolute;right:-17px;width:18px;height:18px;top:50%;transform:translateY(-50%);pointer-events:none;stroke:none;fill:initial;z-index:1}
 .ln svg.hizb-inline-star{position:absolute;pointer-events:none;z-index:1}
+
+/* البحث */
+#panelSearch .phead input{flex:1;height:40px}
+.search-opts{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.toggle.small{font-size:13px;margin:0;align-items:center}
+.toggle.small input{width:18px;height:18px;margin:0}
+#searchCount{font-size:12.5px;color:var(--muted)}
+.list .hit{display:block;width:100%;text-align:right;padding:10px 4px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--ink)}
+.hit small{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:2px}
+.hit small b{color:var(--accent);font-weight:600}
+.more{display:block;margin:14px auto;height:40px;padding:0 18px;border-radius:10px;border:1px solid var(--line2);background:#fff;color:var(--ink);font-size:14px}
+
+/* المواضع والعلامات */
+.ghost{height:40px;padding:0 14px;border-radius:10px;border:1px dashed var(--line2);background:transparent;color:var(--accent);font-size:14px;margin-top:8px}
+#bmToggle{height:42px;width:100%;border:0;border-radius:10px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;margin-bottom:6px}
+#bmToggle.off{background:#fdf1f1;color:#a12a2a;border:1px solid #f0c9c9}
+.list .trow{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.trow .row{border-bottom:0!important;flex:1}
+.trow .ib{width:36px;height:36px}
+.trow .ib svg{width:18px;height:18px}
+.row .dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--line2);flex:0 0 auto}
+.row.on .dot{border-color:var(--accent);background:var(--accent);box-shadow:inset 0 0 0 2px #fff}
+.row.on .mid b{color:var(--accent)}
+.hit .ayah{display:block}
+.hit mark{color:inherit;font-weight:700;text-decoration:none;background:color-mix(in srgb,var(--accent) 16%,transparent);border-radius:4px;padding:0 2px}

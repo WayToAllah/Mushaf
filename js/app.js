@@ -1,6 +1,7 @@
 import { SURAS, PAGES, JUZ_NAME, JUZ_PAGE, juzOfPage, suraPage, surasOnPage, suraName, pageOfAyah, AR, QUARTERS, QUARTER_FRAC, QUARTER_NAME, quarterPage, quartersOnPage, quarterAtPage } from './quran.js';
 import * as S from './store.js';
 import { renderPage, repaint, prefetch, loadFontMap, loadFont, fontUrl } from './mushaf.js';
+import { loadText, search, normQuery, diffWords } from './text.js';
 
 // أنواع الأخطاء. لإضافة نوع جديد: سطر هنا + لون --t-<key> و .w.m-<key> في app.css.
 const TYPES = [
@@ -20,10 +21,12 @@ let page = 1;
 const classFor = id => { const m = S.marks.get(id); return m ? 'm-' + m.type : ''; };
 let renderTok = 0;
 
-async function show(p, dir = 0, focusId = null) {
+// peek: نظرة سريعة (من البحث أو المتشابهات) — موضع القراءة مايتحركش لحد ما تقلّب صفحة
+async function show(p, dir = 0, focusId = null, peek = false) {
   p = Math.max(1, Math.min(PAGES, p | 0));
   page = p;
   S.setMeta('lastPage', p);
+  if (!peek) trackPage(p);
   chrome();
   const tok = ++renderTok;
   stage.querySelectorAll('.sheet,.miss').forEach(e => e.remove());
@@ -42,10 +45,10 @@ async function show(p, dir = 0, focusId = null) {
     await renderPage(sheet, stage, p, classFor, { quarters, style: archStyle ? 'arch' : 'simple' });
     if (tok !== renderTok) return;
     requestAnimationFrame(() => { sheet.style.opacity = '1'; sheet.style.transform = ''; });
-    if (focusId) {
-      const el = sheet.querySelector(`.w[data-id="${focusId}"]`);
+    [].concat(focusId || []).forEach(id => {
+      const el = sheet.querySelector(`.w[data-id="${id}"]`);
       if (el) el.classList.add('pulse');
-    }
+    });
   } catch (e) {
     if (tok !== renderTok) return;
     sheet.remove();
@@ -64,6 +67,8 @@ function chrome() {
   const q = quarterAtPage(page), part = q % 4;
   $('#tJuz').textContent = 'الجزء ' + JUZ_NAME[juzOfPage(page) - 1] + ' · ' + (part ? QUARTER_NAME[part] + ' ' : '') + 'الحزب ' + AR(Math.floor(q / 4) + 1);
   $('#pNum').textContent = AR(page);
+  $('#trackName').textContent = activeTrack().name;
+  $('#btnMarks').classList.toggle('marked', isBookmarked(page));
   $('#prev').style.visibility = page > 1 ? '' : 'hidden';
   $('#next').style.visibility = page < PAGES ? '' : 'hidden';
   counts();
@@ -149,43 +154,134 @@ function openWord(ctx) {
   ww.textContent = ctx.glyph;
   ww.style.fontFamily = ctx.font;
   paintSheet();
-  paintTafsir();
+  paintStudy();
   openLayer('#wordSheet');
 }
 
-// ---------------- التفسير (المختصر) ----------------
-// ملف لكل صفحة: data/tafsir/mukhtasar/<page>.json = {"سورة:آية": "نص"}
-const tafsirCache = new Map();
-function tafsirOf(p) {
-  if (!tafsirCache.has(p)) {
-    tafsirCache.set(p, fetch(`data/tafsir/mukhtasar/${p}.json`)
+// ---------------- دراسة الآية: التفسير / معاني الكلمات / المتشابهات ----------------
+// ملفات لكل صفحة: data/tafsir/mukhtasar/<p>.json و data/gharib/<p>.json — والمتشابهات ملف واحد صغير
+const perPage = dir => {
+  const cache = new Map();
+  return p => {
+    if (!cache.has(p)) cache.set(p, fetch(`data/${dir}/${p}.json`)
       .then(r => { if (!r.ok) throw 0; return r.json(); })
-      .catch(e => { tafsirCache.delete(p); throw e; }));
-  }
-  return tafsirCache.get(p);
-}
-async function paintTafsir() {
-  const box = $('#wsTafsir'), txt = $('#wsTfText');
-  const open = !!S.meta.tafsirOpen;
-  box.classList.toggle('on', open);
-  $('#wsTfToggle').setAttribute('aria-expanded', open);
-  if (!open || !cur) return;
-  const { s, a } = parseId(cur.id), key = s + ':' + a, id = cur.id;
-  txt.className = 'ws-tf-text dim';
-  txt.textContent = 'جاري التحميل…';
+      .catch(e => { cache.delete(p); throw e; }));
+    return cache.get(p);
+  };
+};
+const tafsirOf = perPage('tafsir/mukhtasar');
+const gharibOf = perPage('gharib');
+let mutP = null;
+const mutData = () => mutP || (mutP = fetch('data/mutashabihat.json')
+  .then(r => { if (!r.ok) throw 0; return r.json(); })
+  .catch(e => { mutP = null; throw e; }));
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ayahRef = (s, a) => 'سورة ' + suraName(s) + ' · آية ' + AR(a);
+const NOT_LOADED = 'مش متحمّل على الجهاز — افتح النت مرة، أو حمّل المصحف كامل من الإعدادات.';
+// التبويب المفتوح ('' = مقفول). اللي كان فاتح التفسير قبل كده يلاقيه مفتوح.
+const studyTab = () => S.meta.study !== undefined ? S.meta.study : (S.meta.tafsirOpen ? 'tafsir' : '');
+const countMut = groups => new Set(groups.flatMap(g => g.m.map(m => m.join(',')))).size;
+
+let studyTok = 0;
+async function paintStudy() {
+  if (!cur) return;
+  const tok = ++studyTok, k = studyTab(), { s, a, w } = parseId(cur.id), key = s + ':' + a, p = page;
+  const live = () => tok === studyTok && cur;
+  $('#wsStudy').classList.toggle('on', !!k);
+  $('#wsTabs').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.k === k));
+  $('#wsGharibN').textContent = ''; $('#wsMutN').textContent = '';
+  gharibOf(p).then(g => { if (live() && g[key]) $('#wsGharibN').textContent = AR(g[key].length); }).catch(() => {});
+  mutData().then(m => { if (live() && m[key]) $('#wsMutN').textContent = AR(countMut(m[key])); }).catch(() => {});
+  if (!k) return;
+  const body = $('#wsBody');
+  body.innerHTML = '<p class="dim">جاري التحميل…</p>';
+  let html;
   try {
-    let t = (await tafsirOf(page))[key];
-    if (!t) t = (await tafsirOf(pageOfAyah(s, a)))[key];
-    if (!cur || cur.id !== id) return;
-    txt.className = 'ws-tf-text';
-    txt.textContent = t || 'مفيش تفسير للآية دي.';
+    if (k === 'tafsir') html = studyTafsir((await tafsirOf(p))[key]);
+    else if (k === 'gharib') html = studyGharib((await gharibOf(p))[key] || [], w);
+    else html = studyMut((await mutData())[key] || [], await loadText());
   } catch (_) {
-    if (!cur || cur.id !== id) return;
-    txt.textContent = 'التفسير مش متحمّل على الجهاز — افتح النت مرة، أو حمّل المصحف كامل من الإعدادات.';
+    html = `<p class="dim">${{ tafsir: 'التفسير', gharib: 'معاني الكلمات', mut: 'المتشابهات' }[k]} ${NOT_LOADED}</p>`;
   }
-  $('#wsTfBody').scrollTop = 0;
+  if (!live()) return;
+  body.innerHTML = html;
+  body.scrollTop = 0;
 }
-$('#wsTfToggle').onclick = () => { S.setMeta('tafsirOpen', !S.meta.tafsirOpen); paintTafsir(); };
+
+function studyTafsir(t) {
+  return `<p class="ws-tf-text">${t ? esc(t) : 'مفيش تفسير للآية دي.'}</p>
+    <p class="ws-tf-src">المختصر في التفسير — مركز تفسير للدراسات القرآنية · المصدر: QuranEnc.com</p>`;
+}
+
+// السراج: [رقم_الكلمة, عدد_الكلمات, الكلمة, المعنى] — اللي بيغطي الكلمة الملموسة الأول
+function studyGharib(list, w) {
+  const covers = e => w >= e[0] && w < e[0] + e[1];
+  const items = [...list.filter(covers), ...list.filter(e => !covers(e))];
+  const body = items.length
+    ? items.map(e => `<div class="gh${covers(e) ? ' cur' : ''}"><b>${esc(e[2])}</b>${esc(e[3])}</div>`).join('')
+    : '<p class="dim">مفيش كلمات غريبة في الآية دي في «السراج».</p>';
+  return body + '<p class="ws-tf-src">السراج في بيان غريب القرآن — د. محمد بن عبد العزيز الخضيري</p>';
+}
+
+// كلمات الآيات (ومعاها أول كام كلمة من الآية اللي بعدها لو المتشابه محتاج سياق)
+function ayahSeq(T, keys, ctx) {
+  const seq = [];
+  keys.forEach(k => {
+    const v = T.by.get(k);
+    if (!v) return;
+    v.words.forEach((t, i) => seq.push({ t, n: v.n[i] }));
+    seq.push({ end: v.a });
+  });
+  const next = ctx && T.by.get(keys[keys.length - 1])?.next;
+  if (next) next.words.slice(0, 6).forEach((t, i) => seq.push({ t, n: next.n[i], ctx: true }));
+  if (next && next.words.length > 6) seq.push({ t: '…', ctx: true, skip: true });
+  return seq;
+}
+function seqHtml(seq, flags) {
+  let j = 0;
+  return seq.map(x => {
+    if (x.end) return `<span class="ctx">﴿${AR(x.end)}﴾</span>`;
+    if (x.skip) return '<span class="ctx">…</span>';
+    const t = esc(x.t), f = flags && flags[j++];
+    return x.ctx ? `<span class="ctx">${f ? `<mark>${t}</mark>` : t}</span>` : (f ? `<mark>${t}</mark>` : t);
+  }).join(' ');
+}
+const seqWords = seq => seq.filter(x => !x.end && !x.skip).map(x => x.n);
+
+function studyMut(groups, T) {
+  if (!groups.length) return '<p class="dim">مفيش متشابهات مسجّلة للآية دي.</p>' + MUT_SRC;
+  return groups.map(g => {
+    const src = ayahSeq(T, g.s, g.c), sw = seqWords(src);
+    const first = T.by.get(g.s[0]), last = T.by.get(g.s[g.s.length - 1]);
+    const head = `<div class="mut-src"><small>${g.s.length > 1 ? ayahRef(first.s, first.a) + ' – ' + AR(last.a) : 'الآية دي'}</small><div class="ayah">${seqHtml(src)}</div></div>`;
+    return head + g.m.map(keys => {
+      const v = T.by.get(keys[0]);
+      if (!v) return '';
+      const seq = ayahSeq(T, keys, g.c);
+      const end = T.by.get(keys[keys.length - 1]);
+      return `<button class="mut" data-p="${v.p}" data-id="${v.key}:1">
+        <small><b>${ayahRef(v.s, v.a)}${keys.length > 1 ? ' – ' + AR(end.a) : ''}</b> · ص ${AR(v.p)}</small>
+        <div class="ayah">${seqHtml(seq, diffWords(sw, seqWords(seq)))}</div></button>`;
+    }).join('');
+  }).join('') + '<p class="ws-tf-src">الكلمات الملوّنة هي اللي بتختلف عن الآية دي.</p>' + MUT_SRC;
+}
+const MUT_SRC = '<p class="ws-tf-src">بيانات المتشابهات: Quran Mutashabihat Data (وقار أحمد) — مبنية على عمل القارئ إدريس العاصم.</p>';
+
+$('#wsTabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-k]');
+  if (!b) return;
+  S.setMeta('study', studyTab() === b.dataset.k ? '' : b.dataset.k);
+  paintStudy();
+});
+// المتشابه: نروح نشوفه من غير ما الموضع الحالي يتحرك، ومعانا زرار رجوع
+$('#wsBody').addEventListener('click', e => {
+  const b = e.target.closest('.mut[data-p]');
+  if (!b) return;
+  const back = page;
+  jumpTo(+b.dataset.p, b.dataset.id, true);
+  if (back !== +b.dataset.p) toast('ص ' + AR(+b.dataset.p) + ' — ارجع لصفحة ' + AR(back), { label: 'رجوع', fn: () => show(back, 0, null) });
+});
 
 function paintSheet() {
   const m = S.marks.get(cur.id);
@@ -238,6 +334,7 @@ function commit(id, rec, before, msg) {
 }
 
 $('#snackUndo').onclick = () => {
+  if (snackAct) { const f = snackAct.fn; snackAct = null; hideToast(); f(); return; }
   if (!undoRec) return;
   const { id, before } = undoRec;
   undoRec = null;
@@ -289,11 +386,11 @@ $('#scrim').onclick = closeLayer;
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeLayer);
 addEventListener('keydown', e => { if (e.key === 'Escape') closeLayer(); });
 
-function jumpTo(p, focusId) {
+function jumpTo(p, focusId, peek = false) {
   // نقفل كل الطبقات الأول وبعدين ننتقل
   const n = stack.length;
   if (n) history.go(-n);
-  show(p, 0, focusId);
+  show(p, 0, focusId, peek);
 }
 
 // ---------------- الفهرس ----------------
@@ -423,6 +520,145 @@ async function renderErrors() {
 }
 $('#errList').addEventListener('click', e => { const b = e.target.closest('[data-p]'); if (b) jumpTo(+b.dataset.p, b.dataset.id); });
 
+// ---------------- البحث في القرآن ----------------
+const SEARCH_HINT = '<div class="empty">اكتب كلمة أو جزء من آية.<br>البحث بيتجاهل التشكيل والهمزات والفرق بين الرسم العثماني والإملائي.</div>';
+let searchT, searchRes = null, searchShown = 0;
+$('#btnSearch').onclick = () => {
+  openLayer('#panelSearch');
+  setTimeout(() => $('#searchInput').focus(), 250);
+  loadText().catch(() => {});
+};
+$('#searchInput').addEventListener('input', () => { clearTimeout(searchT); searchT = setTimeout(runSearch, 220); });
+$('#searchInput').addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(searchT); runSearch(); e.target.blur(); } });
+$('#searchWhole').onchange = runSearch;
+
+async function runSearch() {
+  const q = $('#searchInput').value, list = $('#searchList');
+  if (normQuery(q).length < 2) { searchRes = null; list.innerHTML = SEARCH_HINT; $('#searchCount').textContent = ''; return; }
+  let T;
+  try { T = await loadText(); }
+  catch (_) { list.innerHTML = '<div class="empty">نص البحث ' + NOT_LOADED + '</div>'; return; }
+  if ($('#searchInput').value !== q) return;
+  searchRes = search(T, q, { whole: $('#searchWhole').checked });
+  const n = searchRes.hits.length;
+  $('#searchCount').textContent = n ? (searchRes.more ? 'أكتر من ' : '') + AR(n) + ' نتيجة' : '';
+  list.innerHTML = n ? '' : '<div class="empty">مفيش نتايج</div>';
+  searchShown = 0;
+  list.scrollTop = 0;
+  moreHits();
+}
+function moreHits() {
+  const list = $('#searchList'), chunk = searchRes.hits.slice(searchShown, searchShown + 80);
+  searchShown += chunk.length;
+  list.querySelector('.more')?.remove();
+  list.insertAdjacentHTML('beforeend', chunk.map(hitHtml).join('') +
+    (searchShown < searchRes.hits.length ? '<button class="more">عرض المزيد</button>' : ''));
+}
+// النتيجة: الكلمات اللي اتلقت + ٧ كلمات قبلها وبعدها
+function hitHtml({ v, from, to }) {
+  const a = Math.max(1, from - 7), b = Math.min(v.words.length, to + 7), parts = [];
+  for (let i = a; i <= b; i++) { const t = esc(v.words[i - 1]); parts.push(i >= from && i <= to ? `<mark>${t}</mark>` : t); }
+  return `<button class="hit" data-p="${v.p}" data-key="${v.key}" data-from="${from}" data-to="${to}">
+    <small><b>${ayahRef(v.s, v.a)}</b><span>ص ${AR(v.p)}</span></small>
+    <span class="ayah">${a > 1 ? '… ' : ''}${parts.join(' ')}${b < v.words.length ? ' …' : ''}</span></button>`;
+}
+$('#searchList').addEventListener('click', e => {
+  if (e.target.closest('.more')) return moreHits();
+  const b = e.target.closest('.hit');
+  if (!b) return;
+  const ids = [];
+  for (let i = +b.dataset.from; i <= +b.dataset.to; i++) ids.push(b.dataset.key + ':' + i);
+  jumpTo(+b.dataset.p, ids, true);
+});
+
+// ---------------- المواضع والعلامات ----------------
+// المواضع: كل واحد بيفتكر آخر صفحة (الحفظ، المراجعة، …) — الموضع الحالي بيمشي مع تقليب الصفحات.
+// العلامات: صفحات محفوظة. الاتنين في meta وبيدخلوا في النسخة الاحتياطية.
+function tracks() {
+  if (!Array.isArray(S.meta.tracks) || !S.meta.tracks.length) {
+    const p = S.meta.lastPage || 1, t = Date.now();
+    S.setMeta('tracks', [{ id: 'hifz', name: 'الحفظ', page: p, t }, { id: 'murajaa', name: 'المراجعة', page: p, t }]);
+    S.setMeta('activeTrack', 'hifz');
+  }
+  return S.meta.tracks;
+}
+const activeTrack = () => { const ts = tracks(); return ts.find(t => t.id === S.meta.activeTrack) || ts[0]; };
+function trackPage(p) {
+  const a = activeTrack();
+  if (a.page !== p) S.setMeta('tracks', tracks().map(t => t.id === a.id ? { ...t, page: p, t: Date.now() } : t));
+}
+const bookmarks = () => Array.isArray(S.meta.bookmarks) ? S.meta.bookmarks : [];
+const isBookmarked = p => bookmarks().some(b => b.p === p);
+const pageWhere = p => 'سورة ' + suraName(surasOnPage(p)[0]) + ' · الجزء ' + JUZ_NAME[juzOfPage(p) - 1];
+const PENCIL = '<svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+const CROSS = '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+$('#btnMarks').onclick = () => { renderMarks(); openLayer('#panelMarks'); };
+function renderMarks() {
+  const act = activeTrack();
+  $('#trackList').innerHTML = tracks().map(t => `<div class="trow">
+    <button class="row${t.id === act.id ? ' on' : ''}" data-track="${t.id}"><span class="dot"></span>
+      <span class="mid"><b>${esc(t.name)}</b><span>${pageWhere(t.page)}</span></span>
+      <span class="pgno">ص ${AR(t.page)}</span></button>
+    <button class="ib" data-edit="${t.id}" aria-label="تعديل ${esc(t.name)}">${PENCIL}</button></div>`).join('');
+  const marked = isBookmarked(page);
+  $('#bmToggle').textContent = marked ? 'شيل علامة صفحة ' + AR(page) : 'علّم صفحة ' + AR(page);
+  $('#bmToggle').classList.toggle('off', marked);
+  const bms = [...bookmarks()].sort((a, b) => b.t - a.t);
+  $('#bmList').innerHTML = bms.length ? bms.map(b => `<div class="trow">
+    <button class="row" data-bm="${b.p}"><span class="num">${AR(b.p)}</span>
+      <span class="mid"><b>${esc(b.name || pageWhere(b.p))}</b><span>${b.name ? pageWhere(b.p) + ' · ' : ''}${new Date(b.t).toLocaleDateString('ar-EG')}</span></span></button>
+    <button class="ib" data-bmedit="${b.p}" aria-label="ملاحظة">${PENCIL}</button>
+    <button class="ib" data-bmdel="${b.p}" aria-label="حذف">${CROSS}</button></div>`).join('')
+    : '<div class="empty">لسه مفيش علامات.</div>';
+}
+$('#trackList').addEventListener('click', e => {
+  const r = e.target.closest('[data-track]'), ed = e.target.closest('[data-edit]');
+  if (r) {
+    const t = tracks().find(x => x.id === r.dataset.track);
+    S.setMeta('activeTrack', t.id);
+    jumpTo(t.page);
+    toast('موضع ' + t.name + ' · ص ' + AR(t.page));
+  } else if (ed) {
+    const ts = tracks(), t = ts.find(x => x.id === ed.dataset.edit);
+    const name = prompt('اسم الموضع (امسح الاسم عشان تحذفه)', t.name);
+    if (name === null) return;
+    if (!name.trim()) {
+      if (ts.length < 2) return toast('لازم يفضل موضع واحد على الأقل');
+      if (!confirm('تحذف موضع «' + t.name + '»؟')) return;
+      S.setMeta('tracks', ts.filter(x => x.id !== t.id));
+      if (S.meta.activeTrack === t.id) S.setMeta('activeTrack', S.meta.tracks[0].id);
+    } else S.setMeta('tracks', ts.map(x => x.id === t.id ? { ...x, name: name.trim().slice(0, 30), t: Date.now() } : x));
+    renderMarks(); chrome();
+  }
+});
+$('#trackAdd').onclick = () => {
+  const name = prompt('اسم الموضع الجديد — هيبدأ من الصفحة دي', 'التلاوة');
+  if (!name || !name.trim()) return;
+  const t = { id: 't' + Date.now().toString(36), name: name.trim().slice(0, 30), page, t: Date.now() };
+  S.setMeta('tracks', [...tracks(), t]);
+  S.setMeta('activeTrack', t.id);
+  renderMarks(); chrome();
+};
+$('#bmToggle').onclick = () => {
+  const marked = isBookmarked(page);
+  S.setMeta('bookmarks', marked ? bookmarks().filter(b => b.p !== page) : [...bookmarks(), { p: page, t: Date.now() }]);
+  toast(marked ? 'اتشالت العلامة' : 'اتعلّمت صفحة ' + AR(page));
+  renderMarks(); chrome();
+};
+$('#bmList').addEventListener('click', e => {
+  const go = e.target.closest('[data-bm]'), ed = e.target.closest('[data-bmedit]'), del = e.target.closest('[data-bmdel]');
+  if (go) return jumpTo(+go.dataset.bm);
+  if (ed) {
+    const b = bookmarks().find(x => x.p === +ed.dataset.bmedit);
+    const name = prompt('ملاحظة للعلامة (اختياري)', b.name || '');
+    if (name === null) return;
+    S.setMeta('bookmarks', bookmarks().map(x => x === b ? { ...x, name: name.trim().slice(0, 60) || undefined, t: x.t } : x));
+  }
+  if (del) S.setMeta('bookmarks', bookmarks().filter(x => x.p !== +del.dataset.bmdel));
+  renderMarks(); chrome();
+});
+
 // ---------------- الإعدادات ----------------
 $('#btnSettings').onclick = () => { renderSettings(); openLayer('#panelSettings'); };
 $('#setDefault').innerHTML = TYPES.map(t => `<option value="${t.key}">${t.name}</option>`).join('');
@@ -442,7 +678,7 @@ async function renderSettings() {
     (S.storageMode() === 'ls' ? ' (تخزين احتياطي — المتصفح ده مش بيدعم IndexedDB)' : '') + '.<br>' +
     (persisted ? 'المتصفح موافق على الحفظ الدائم ✓' : 'المتصفح لسه ماأكدش الحفظ الدائم — تثبيت التطبيق على الشاشة الرئيسية بيساعد.') +
     (last ? '<br>آخر نسخة احتياطية: ' + last : '');
-  if (S.meta.offlineDone === 2) $('#offlineInfo').textContent = 'المصحف كامل والتفسير متحمّلين على الجهاز ✓ — كل الصفحات بتشتغل بدون إنترنت.';
+  if (S.meta.offlineDone === 3) $('#offlineInfo').textContent = 'المصحف كامل مع التفسير ومعاني الكلمات والبحث متحمّل على الجهاز ✓ — كله بيشتغل بدون إنترنت.';
 }
 
 $('#btnExport').onclick = async () => {
@@ -471,7 +707,8 @@ $('#importFile').onchange = async e => {
   try {
     const n = await S.importData(JSON.parse(await f.text()));
     refresh(); renderSettings();
-    toast(n ? 'اتضاف/اتحدّث ' + AR(n) + ' خطأ' : 'كل الأخطاء اللي في الملف موجودة بالفعل');
+    chrome();
+    toast(n ? 'اتضاف/اتحدّث ' + AR(n) + ' (أخطاء ومواضع وعلامات)' : 'كل اللي في الملف موجود بالفعل');
   } catch (_) { toast('الملف ده مش نسخة احتياطية من مصحف المراجعة'); }
 };
 $('#btnClear').onclick = async () => {
@@ -490,7 +727,8 @@ $('#btnDownload').onclick = async () => {
   try {
     const fm = await loadFontMap();
     const urls = [...Object.keys(fm.fonts).map(fontUrl)];
-    for (let p = 1; p <= PAGES; p++) urls.push(`data/${p}.json`, `data/tafsir/mukhtasar/${p}.json`);
+    urls.push('data/text.json', 'data/mutashabihat.json');
+    for (let p = 1; p <= PAGES; p++) urls.push(`data/${p}.json`, `data/tafsir/mukhtasar/${p}.json`, `data/gharib/${p}.json`);
     const cache = await caches.open('mushaf-data-v1');
     let done = 0, fail = 0, i = 0;
     const step = () => { done++; bar.firstElementChild.style.width = (done / urls.length * 100).toFixed(1) + '%'; btn.textContent = 'جاري التحميل ' + AR(Math.round(done / urls.length * 100)) + '٪'; };
@@ -503,7 +741,7 @@ $('#btnDownload').onclick = async () => {
     };
     await Promise.all(Array.from({ length: 6 }, worker));
     if (fail) { toast('اتحمّل الأغلب، و' + AR(fail) + ' ملف فشل — جرّب تاني'); btn.textContent = 'كمّل التحميل'; }
-    else { S.setMeta('offlineDone', 2); btn.textContent = 'اتحمّل المصحف كامل ✓'; renderSettings(); S.requestPersist(); }
+    else { S.setMeta('offlineDone', 3); btn.textContent = 'اتحمّل المصحف كامل ✓'; renderSettings(); S.requestPersist(); }
   } catch (_) { toast('التحميل فشل — اتأكد من الإنترنت'); btn.textContent = 'تحميل المصحف كاملًا'; }
   btn.disabled = false;
 };
@@ -514,10 +752,14 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = 
 $('#btnInstall').onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $('#installCard').hidden = true; };
 
 // ---------------- رسائل قصيرة ----------------
-let toastT;
-function toast(msg, withUndo = false) {
+let toastT, snackAct = null;
+// act: true = زرار «تراجع» للأخطاء، أو { label, fn } لأي إجراء تاني
+function toast(msg, act = false) {
+  const withUndo = !!act;
+  snackAct = typeof act === 'object' ? act : null;
   $('#snackText').textContent = msg;
   $('#snackUndo').hidden = !withUndo;
+  $('#snackUndo').textContent = snackAct ? snackAct.label : 'تراجع';
   $('#snack').classList.add('on');
   clearTimeout(toastT);
   toastT = setTimeout(hideToast, withUndo ? 4000 : 2200);

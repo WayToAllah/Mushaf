@@ -118,7 +118,19 @@ export function exportData() {
   return {
     app: 'mushaf-app', version: 1, exported: new Date().toISOString(),
     marks: [...marks.values()],
+    tracks: meta.tracks, activeTrack: meta.activeTrack, bookmarks: meta.bookmarks,
   };
+}
+
+// المواضع والعلامات: دمج بالمعرّف، والأحدث (t) يكسب
+function mergeBy(local, incoming, keyOf, ok) {
+  const out = new Map((Array.isArray(local) ? local : []).map(x => [keyOf(x), x]));
+  let n = 0;
+  (Array.isArray(incoming) ? incoming : []).filter(ok).forEach(x => {
+    const cur = out.get(keyOf(x));
+    if (!cur || (x.t || 0) > (cur.t || 0)) { out.set(keyOf(x), x); n++; }
+  });
+  return { list: [...out.values()], n };
 }
 
 // دمج: السجل الأحدث (updated) هو اللي بيكسب. بيرجّع عدد السجلات اللي اتضافت/اتحدثت.
@@ -129,5 +141,10 @@ export async function importData(obj) {
   changed.forEach(m => marks.set(m.id, m));
   if (mode === 'ls') lsFlush();
   else await write('marks', s => changed.forEach(m => s.put(m)));
-  return changed.length;
+  const okPage = x => x && +x.page >= 1 && +x.page <= 604;
+  const tr = mergeBy(meta.tracks, obj.tracks, x => x.id, x => okPage(x) && typeof x.id === 'string' && typeof x.name === 'string');
+  if (tr.n) { await setMeta('tracks', tr.list); if (!meta.activeTrack && obj.activeTrack) await setMeta('activeTrack', obj.activeTrack); }
+  const bm = mergeBy(meta.bookmarks, obj.bookmarks, x => x.p, x => x && +x.p >= 1 && +x.p <= 604);
+  if (bm.n) await setMeta('bookmarks', bm.list);
+  return changed.length + tr.n + bm.n;
 }

@@ -1,10 +1,10 @@
 // الواجهة: من الشبكة أولًا (عشان التحديثات توصل) ولو مفيش نت من الكاش.
 // صفحات المصحف والخطوط: من الكاش أولًا (مش بتتغير)، وبتتخزّن أول ما تتفتح.
-const SHELL = 'mushaf-shell-v6';
+const SHELL = 'mushaf-shell-v7';
 const DATA = 'mushaf-data-v1';
 const SHELL_FILES = [
   './', 'index.html', 'app.css', 'manifest.json', 'fontmap.json',
-  'js/app.js', 'js/store.js', 'js/quran.js', 'js/mushaf.js', 'js/hizb-marker.js',
+  'js/app.js', 'js/store.js', 'js/quran.js', 'js/mushaf.js', 'js/hizb-marker.js', 'js/text.js',
   'fonts/amiri/amiri-arabic-400-normal.woff2', 'fonts/amiri/amiri-arabic-700-normal.woff2',
   'icons/icon-192.png', 'icons/icon-512.png',
 ];
