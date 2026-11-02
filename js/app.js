@@ -2,6 +2,7 @@ import { SURAS, PAGES, JUZ_NAME, JUZ_PAGE, juzOfPage, suraPage, surasOnPage, sur
 import * as S from './store.js';
 import { renderPage, repaint, prefetch, loadFontMap, loadFont, fontUrl } from './mushaf.js';
 import { loadText, search, normQuery, diffWords } from './text.js';
+import { createPlayer, RECITERS, DEFAULT_RECITER, reciterName } from './audio.js';
 
 // أنواع الأخطاء. لإضافة نوع جديد: سطر هنا + لون --t-<key> و .w.m-<key> في app.css.
 const TYPES = [
@@ -49,6 +50,7 @@ async function show(p, dir = 0, focusId = null, peek = false) {
       const el = sheet.querySelector(`.w[data-id="${id}"]`);
       if (el) el.classList.add('pulse');
     });
+    markPlaying(sheet);
   } catch (e) {
     if (tok !== renderTok) return;
     sheet.remove();
@@ -659,6 +661,78 @@ $('#bmList').addEventListener('click', e => {
   renderMarks(); chrome();
 });
 
+// ---------------- التلاوة ----------------
+// repeat: عدد مرات كل آية (0 = على طول)، cont: يكمّل للآية اللي بعدها
+const REPEATS = [1, 2, 3, 5, 0];
+const audioOpts = () => ({ reciter: S.meta.reciter || DEFAULT_RECITER, repeat: S.meta.repeat ?? 1, cont: S.meta.cont !== false });
+let playKey = null, refitT;
+const player = createPlayer({
+  options: audioOpts,
+  change: st => paintPlayer(st),
+  error: () => toast('مقدرتش أشغّل التلاوة — اتأكد إنك متصل بالإنترنت'),
+});
+
+function paintPlayer(st) {
+  const bar = $('#player'), wasOpen = !bar.hidden;
+  bar.hidden = !st;
+  document.body.classList.toggle('playing', !!st);
+  // المشغّل بياخد مساحة من الصفحة، فنعيد ضبط مقاسها لما يظهر أو يختفي
+  if (wasOpen !== !!st) { clearTimeout(refitT); refitT = setTimeout(() => show(page), 30); }
+  if (!st) { playKey = null; markPlaying(); return; }
+  const { repeat, reciter } = audioOpts();
+  bar.classList.toggle('on', st.playing);
+  $('#plRef').textContent = suraName(st.s) + ' · ' + (st.bsm ? 'البسملة' : 'آية ' + AR(st.a));
+  $('#plSub').textContent = reciterName(reciter) + (repeat !== 1 && !st.bsm ? ' · المرة ' + AR(st.rep) + (repeat ? ' من ' + AR(repeat) : '') : '');
+  $('#plRepeat').textContent = repeat ? 'تكرار ×' + AR(repeat) : 'تكرار ∞';
+  $('#plRepeat').classList.toggle('on', repeat !== 1);
+  const key = st.s + ':' + st.a;
+  if (key !== playKey) {
+    const prevKey = playKey;
+    playKey = key;
+    followAyah(prevKey, st);
+    markPlaying();
+  }
+}
+// كلمات الآية اللي بتتقري بتتلوّن
+function markPlaying(root = stage) {
+  root.querySelectorAll('.w.playing').forEach(e => e.classList.remove('playing'));
+  if (playKey) root.querySelectorAll(`.w[data-id^="${playKey}:"]`).forEach(e => e.classList.add('playing'));
+}
+// الصفحة بتتقلب مع التلاوة — بس لو كنت واقف على صفحة الآية اللي خلصت (مش لو بتتفرج على حتة تانية)
+function followAyah(prevKey, st) {
+  const p = pageOfAyah(st.s, st.a);
+  if (p === page || !prevKey) return;
+  const [ps, pa] = prevKey.split(':').map(Number);
+  if (pageOfAyah(ps, pa) === page) show(p, p > page ? 1 : -1);
+}
+
+$('#wsListen').onclick = () => {
+  if (!cur) return;
+  const { s, a } = parseId(cur.id);
+  closeLayer();
+  player.playFrom(s, a);
+};
+$('#plPlay').onclick = () => player.toggle();
+$('#plNext').onclick = () => player.next();
+$('#plPrev').onclick = () => player.prev();
+$('#plClose').onclick = () => player.stop();
+$('#plRepeat').onclick = () => {
+  const r = audioOpts().repeat;
+  S.setMeta('repeat', REPEATS[(REPEATS.indexOf(r) + 1) % REPEATS.length]);
+  paintPlayer(player.state());
+  const n = audioOpts().repeat;
+  toast(n === 1 ? 'من غير تكرار' : n ? 'كل آية هتتكرر ' + AR(n) + ' مرات' : 'الآية هتتكرر على طول لحد ما توقفها');
+};
+$('#plInfo').onclick = () => { const st = player.state(); if (st) jumpTo(pageOfAyah(st.s, st.a), st.s + ':' + st.a + ':1'); };
+addEventListener('keydown', e => {
+  if (e.key !== ' ' || !player.state() || e.target.matches('input,select,textarea,button')) return;
+  e.preventDefault();
+  player.toggle();
+});
+$('#setReciter').innerHTML = RECITERS.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+$('#setReciter').onchange = e => { S.setMeta('reciter', e.target.value); player.reload(); };
+$('#setCont').onchange = e => S.setMeta('cont', e.target.checked);
+
 // ---------------- المظهر (الوضع الليلي) ----------------
 // theme: auto (حسب الجهاز) / light / dark — بيتنسخ في localStorage عشان سكريبت الـ head يطبّقه قبل أول رسم
 const darkMQ = matchMedia('(prefers-color-scheme: dark)');
@@ -689,6 +763,8 @@ async function renderSettings() {
   $('#setQuick').checked = !!S.meta.quick;
   $('#setDefault').value = S.meta.defType || 'hifz';
   $('#setRub').value = S.meta.rubStyle || 'arch';
+  $('#setReciter').value = audioOpts().reciter;
+  $('#setCont').checked = audioOpts().cont;
   const persisted = await S.isPersisted();
   const n = S.marks.size;
   const last = S.meta.lastBackup ? new Date(S.meta.lastBackup).toLocaleDateString('ar-EG') : null;

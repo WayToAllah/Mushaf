@@ -43,6 +43,19 @@
     <button class="nav l" id="next" aria-label="الصفحة التالية">&#8249;</button>
   </main>
 
+  <!-- مشغّل التلاوة: بيظهر لما تشغّل آية -->
+  <div class="player" id="player" hidden>
+    <button class="ib" id="plPrev" aria-label="الآية السابقة"><svg viewBox="0 0 24 24"><path d="M18 5v14M6 6l8 6-8 6z"/></svg></button>
+    <button class="ib play" id="plPlay" aria-label="تشغيل / إيقاف مؤقت">
+      <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5l11 7-11 7z"/></svg>
+      <svg viewBox="0 0 24 24" class="i-pause"><path d="M8 5v14M16 5v14"/></svg>
+    </button>
+    <button class="ib" id="plNext" aria-label="الآية التالية"><svg viewBox="0 0 24 24"><path d="M6 5v14M18 6l-8 6 8 6z"/></svg></button>
+    <button class="plinfo" id="plInfo" aria-label="روح لصفحة الآية"><b id="plRef"></b><span id="plSub"></span></button>
+    <button class="chip" id="plRepeat" aria-label="عدد مرات تكرار الآية"></button>
+    <button class="ib" id="plClose" aria-label="قفل المشغّل"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
   <footer class="bottom">
     <button class="ib" id="btnHide" aria-label="إخفاء الأخطاء" title="إخفاء الأخطاء للتسميع">
       <svg viewBox="0 0 24 24" class="eye-on"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -69,6 +82,9 @@
   <div class="ws-head">
     <div class="ws-word" id="wsWord"></div>
     <div class="ws-ref"><b id="wsRef"></b><span id="wsInfo"></span></div>
+    <button class="listen" id="wsListen" aria-label="استمع للآية">
+      <svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z"/></svg><span>استمع</span>
+    </button>
   </div>
   <div class="types" id="wsTypes"></div>
   <div class="ws-existing" id="wsExisting">
@@ -194,6 +210,15 @@
         <button data-v="dark">ليلي</button>
       </div>
       <p class="note">«تلقائي» بيمشي مع وضع الجهاز (فاتح بالنهار وليلي بالليل لو الجهاز مظبوط كده).</p>
+    </div>
+
+    <div class="card">
+      <h3>التلاوة</h3>
+      <label class="field">القارئ
+        <select id="setReciter"></select>
+      </label>
+      <label class="toggle" style="margin-top:12px"><input type="checkbox" id="setCont"><span>كمّل للآية اللي بعدها تلقائيًا (والصفحة بتتقلب لوحدها)</span></label>
+      <p class="note">الصوت من everyayah.com ومحتاج إنترنت. لتشغيل آية: المس أي كلمة فيها واختار «استمع». زرار التكرار في المشغّل بيكرر كل آية ١ أو ٢ أو ٣ أو ٥ مرات أو على طول.</p>
     </div>
 
     <div class="card">
