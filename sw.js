@@ -1,6 +1,6 @@
 // الواجهة: من الشبكة أولًا (عشان التحديثات توصل) ولو مفيش نت من الكاش.
 // صفحات المصحف والخطوط: من الكاش أولًا (مش بتتغير)، وبتتخزّن أول ما تتفتح.
-const SHELL = 'mushaf-shell-v7';
+const SHELL = 'mushaf-shell-v8';
 const DATA = 'mushaf-data-v1';
 const SHELL_FILES = [
   './', 'index.html', 'app.css', 'manifest.json', 'fontmap.json',

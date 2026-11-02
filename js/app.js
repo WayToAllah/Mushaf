@@ -659,6 +659,25 @@ $('#bmList').addEventListener('click', e => {
   renderMarks(); chrome();
 });
 
+// ---------------- المظهر (الوضع الليلي) ----------------
+// theme: auto (حسب الجهاز) / light / dark — بيتنسخ في localStorage عشان سكريبت الـ head يطبّقه قبل أول رسم
+const darkMQ = matchMedia('(prefers-color-scheme: dark)');
+function applyTheme() {
+  const t = S.meta.theme || 'auto', root = document.documentElement;
+  if (t === 'auto') delete root.dataset.theme; else root.dataset.theme = t;
+  try { localStorage.setItem('mushaf-theme', t); } catch (_) {}
+  const dark = t === 'dark' || (t === 'auto' && darkMQ.matches);
+  document.querySelector('meta[name="theme-color"]').content = dark ? '#15130f' : '#fff9f1';
+  $('#setTheme').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === t));
+}
+if (darkMQ.addEventListener) darkMQ.addEventListener('change', applyTheme);
+$('#setTheme').addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]');
+  if (!b) return;
+  S.setMeta('theme', b.dataset.v);
+  applyTheme();
+});
+
 // ---------------- الإعدادات ----------------
 $('#btnSettings').onclick = () => { renderSettings(); openLayer('#panelSettings'); };
 $('#setDefault').innerHTML = TYPES.map(t => `<option value="${t.key}">${t.name}</option>`).join('');
@@ -770,6 +789,7 @@ function hideToast() { $('#snack').classList.remove('on'); }
 (async () => {
   await S.init();
   applyHide();
+  applyTheme();
   const q = new URLSearchParams(location.search);
   const start = +q.get('p') || S.meta.lastPage || 1;
   show(start);

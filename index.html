@@ -4,6 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#fff9f1">
+<script>
+  // الوضع الليلي قبل أول رسم عشان مايبقاش فيه وميض أبيض (نسخة من الإعداد في localStorage)
+  try {
+    var t = localStorage.getItem('mushaf-theme');
+    if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t;
+    if (t === 'dark' || (t !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches))
+      document.querySelector('meta[name="theme-color"]').content = '#15130f';
+  } catch (e) {}
+</script>
 <meta name="description" content="مصحف لتعليم أخطاء الحفظ والتلاوة — الأخطاء تتحفظ على جهازك">
 <title>مصحف المراجعة</title>
 <link rel="manifest" href="manifest.json">
@@ -175,6 +184,16 @@
         <select id="setDefault"></select>
       </label>
       <p class="note">في التعليم السريع، لمس كلمة معلّمة بيفتح لوحة تغيير النوع أو الإزالة.</p>
+    </div>
+
+    <div class="card">
+      <h3>المظهر</h3>
+      <div class="tabs" id="setTheme">
+        <button data-v="auto">تلقائي</button>
+        <button data-v="light">فاتح</button>
+        <button data-v="dark">ليلي</button>
+      </div>
+      <p class="note">«تلقائي» بيمشي مع وضع الجهاز (فاتح بالنهار وليلي بالليل لو الجهاز مظبوط كده).</p>
     </div>
 
     <div class="card">
