@@ -2,6 +2,7 @@
 // المشغّل: تكرار الآية، والانتقال للآية اللي بعدها، والبسملة قبل أول كل سورة (غير الفاتحة والتوبة).
 
 import { SURAS, suraName, AR } from './quran.js';
+import * as AC from './audio-cache.js';
 
 // أسماء الفولدرات زي ما هي على everyayah.com/data/
 export const RECITERS = [
@@ -31,7 +32,7 @@ export function prevAyah(s, a) { return a > 1 ? [s, a - 1] : s > 1 ? [s - 1, SUR
 const needsBasmala = (s, a) => a === 1 && s !== 1 && s !== 9;
 
 /**
- * hooks.options() → { reciter, repeat (عدد مرات الآية، 0 = بلا نهاية), cont (يكمّل للي بعدها) }
+ * hooks.options() → { reciter, repeat (عدد مرات الآية، 0 = بلا نهاية), cont (يكمّل للي بعدها), save (يحفظ اللي بيتسمع) }
  * hooks.change(state) — كل ما الحالة تتغير. state = null لما المشغّل يقف خالص.
  * hooks.error() — الملف ماشتغلش (غالبًا مفيش نت).
  */
@@ -40,16 +41,31 @@ export function createPlayer(hooks) {
   const pre = new Audio(); // تحميل الآية اللي بعدها مسبقًا عشان مايبقاش فيه سكتة
   el.preload = pre.preload = 'auto';
   let st = null; // { s, a, rep, bsm }
+  let loadTok = 0, blobUrl = null, fromCache = false;
 
-  const state = () => st && { s: st.s, a: st.a, rep: st.rep, bsm: st.bsm, playing: !el.paused };
+  const state = () => st && { s: st.s, a: st.a, rep: st.rep, bsm: st.bsm, playing: !el.paused, saved: fromCache };
   const emit = () => { hooks.change(state()); media(); };
 
-  function load() {
-    const { reciter } = hooks.options();
-    el.src = st.bsm ? audioUrl(reciter, 1, 1) : audioUrl(reciter, st.s, st.a);
+  // المحفوظ على الجهاز بيشتغل من الكاش (بدون نت)، وغيره بيشتغل من النت على طول ويتحفظ في الخلفية
+  async function load() {
+    const tok = ++loadTok, { reciter, save } = hooks.options();
+    const url = st.bsm ? audioUrl(reciter, 1, 1) : audioUrl(reciter, st.s, st.a);
+    fromCache = false;
+    emit();
+    const blob = await AC.cachedBlob(url);
+    if (tok !== loadTok || !st) return;
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = blob ? URL.createObjectURL(blob) : null;
+    fromCache = !!blob;
+    el.src = blobUrl || url;
     el.play().catch(e => { if (e && e.name !== 'AbortError') emit(); });
+    if (!blob && save) AC.save(url);
+    // الآية اللي بعدها: تتحفظ مسبقًا (أو تتحمّل في مشغّل مخفي لو الحفظ مقفول) عشان مايبقاش فيه سكتة
     const n = st.bsm ? [st.s, st.a] : nextAyah(st.s, st.a);
-    if (n) pre.src = needsBasmala(...n) && !st.bsm ? audioUrl(reciter, 1, 1) : audioUrl(reciter, n[0], n[1]);
+    if (n) {
+      const nu = needsBasmala(...n) && !st.bsm ? audioUrl(reciter, 1, 1) : audioUrl(reciter, n[0], n[1]);
+      if (save && AC.supported && !AC.blocked()) AC.save(nu); else pre.src = nu;
+    }
     emit();
   }
   function go(s, a) { st = { s, a, rep: 1, bsm: needsBasmala(s, a) }; load(); }
@@ -103,7 +119,11 @@ export function createPlayer(hooks) {
       if (el.currentTime > 2 && !st.bsm) { el.currentTime = 0; return el.paused && el.play(); } // زي أي مشغّل: يرجع لأول الآية
       const p = prevAyah(st.s, st.a); if (p) go(...p);
     },
-    stop() { el.pause(); el.removeAttribute('src'); el.load(); st = null; emit(); },
+    stop() {
+      loadTok++; el.pause(); el.removeAttribute('src'); el.load(); st = null;
+      if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
+      emit();
+    },
     // بعد تغيير القارئ: نفس الآية بالصوت الجديد
     reload() { if (st) { const was = !el.paused; load(); if (!was) el.pause(); } },
     state,

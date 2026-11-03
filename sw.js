@@ -1,10 +1,10 @@
 // الواجهة: من الشبكة أولًا (عشان التحديثات توصل) ولو مفيش نت من الكاش.
 // صفحات المصحف والخطوط: من الكاش أولًا (مش بتتغير)، وبتتخزّن أول ما تتفتح.
-const SHELL = 'mushaf-shell-v9';
+const SHELL = 'mushaf-shell-v10';
 const DATA = 'mushaf-data-v1';
 const SHELL_FILES = [
   './', 'index.html', 'app.css', 'manifest.json', 'fontmap.json',
-  'js/app.js', 'js/store.js', 'js/quran.js', 'js/mushaf.js', 'js/hizb-marker.js', 'js/text.js', 'js/audio.js',
+  'js/app.js', 'js/store.js', 'js/quran.js', 'js/mushaf.js', 'js/hizb-marker.js', 'js/text.js', 'js/audio.js', 'js/audio-cache.js',
   'fonts/amiri/amiri-arabic-400-normal.woff2', 'fonts/amiri/amiri-arabic-700-normal.woff2',
   'icons/icon-192.png', 'icons/icon-512.png',
 ];
@@ -15,7 +15,8 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== SHELL && k !== DATA).map(k => caches.delete(k))))
+    // التلاوات المحفوظة (mushaf-audio-*) بتفضل زي ما هي مع أي تحديث
+    .then(keys => Promise.all(keys.filter(k => k !== SHELL && k !== DATA && !k.startsWith('mushaf-audio')).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 

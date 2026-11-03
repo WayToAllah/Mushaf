@@ -218,7 +218,20 @@
         <select id="setReciter"></select>
       </label>
       <label class="toggle" style="margin-top:12px"><input type="checkbox" id="setCont"><span>كمّل للآية اللي بعدها تلقائيًا (والصفحة بتتقلب لوحدها)</span></label>
-      <p class="note">الصوت من everyayah.com ومحتاج إنترنت. لتشغيل آية: المس أي كلمة فيها واختار «استمع». زرار التكرار في المشغّل بيكرر كل آية ١ أو ٢ أو ٣ أو ٥ مرات أو على طول.</p>
+      <p class="note">لتشغيل آية: المس أي كلمة فيها واختار «استمع». زرار التكرار في المشغّل بيكرر كل آية ١ أو ٢ أو ٣ أو ٥ مرات أو على طول. الصوت من everyayah.com.</p>
+    </div>
+
+    <div class="card">
+      <h3>التلاوة بدون إنترنت</h3>
+      <label class="toggle"><input type="checkbox" id="setSaveAudio"><span>احفظ أي آية بتسمعها على الجهاز، عشان تشتغل بعد كده من غير نت</span></label>
+      <p class="note" id="audioInfo"></p>
+      <div class="progress" id="adlProg" hidden><i></i></div>
+      <div class="btnrow">
+        <button id="dlSura"></button>
+        <button id="dlJuz"></button>
+      </div>
+      <p class="note">التحميل بصوت القارئ اللي مختاره. السورة أو الجزء حوالي ٥–٢٥ ميجا حسب القارئ.</p>
+      <button class="ghost" id="audioClear">مسح التلاوات المحفوظة</button>
     </div>
 
     <div class="card">

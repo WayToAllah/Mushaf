@@ -1,8 +1,9 @@
-import { SURAS, PAGES, JUZ_NAME, JUZ_PAGE, juzOfPage, suraPage, surasOnPage, suraName, pageOfAyah, AR, QUARTERS, QUARTER_FRAC, QUARTER_NAME, quarterPage, quartersOnPage, quarterAtPage } from './quran.js';
+import { SURAS, PAGES, JUZ_NAME, JUZ_PAGE, JUZ_START, juzOfPage, suraPage, surasOnPage, suraName, pageOfAyah, AR, QUARTERS, QUARTER_FRAC, QUARTER_NAME, quarterPage, quartersOnPage, quarterAtPage } from './quran.js';
 import * as S from './store.js';
 import { renderPage, repaint, prefetch, loadFontMap, loadFont, fontUrl } from './mushaf.js';
 import { loadText, search, normQuery, diffWords } from './text.js';
-import { createPlayer, RECITERS, DEFAULT_RECITER, reciterName } from './audio.js';
+import { createPlayer, RECITERS, DEFAULT_RECITER, reciterName, audioUrl, nextAyah } from './audio.js';
+import * as AC from './audio-cache.js';
 
 // أنواع الأخطاء. لإضافة نوع جديد: سطر هنا + لون --t-<key> و .w.m-<key> في app.css.
 const TYPES = [
@@ -664,12 +665,12 @@ $('#bmList').addEventListener('click', e => {
 // ---------------- التلاوة ----------------
 // repeat: عدد مرات كل آية (0 = على طول)، cont: يكمّل للآية اللي بعدها
 const REPEATS = [1, 2, 3, 5, 0];
-const audioOpts = () => ({ reciter: S.meta.reciter || DEFAULT_RECITER, repeat: S.meta.repeat ?? 1, cont: S.meta.cont !== false });
+const audioOpts = () => ({ reciter: S.meta.reciter || DEFAULT_RECITER, repeat: S.meta.repeat ?? 1, cont: S.meta.cont !== false, save: S.meta.saveAudio !== false });
 let playKey = null, refitT;
 const player = createPlayer({
   options: audioOpts,
   change: st => paintPlayer(st),
-  error: () => toast('مقدرتش أشغّل التلاوة — اتأكد إنك متصل بالإنترنت'),
+  error: () => toast(navigator.onLine ? 'مقدرتش أشغّل التلاوة — جرّب تاني' : 'الآية دي مش محفوظة على الجهاز ومفيش إنترنت — حمّلها من الإعدادات وانت متصل'),
 });
 
 function paintPlayer(st) {
@@ -682,7 +683,7 @@ function paintPlayer(st) {
   const { repeat, reciter } = audioOpts();
   bar.classList.toggle('on', st.playing);
   $('#plRef').textContent = suraName(st.s) + ' · ' + (st.bsm ? 'البسملة' : 'آية ' + AR(st.a));
-  $('#plSub').textContent = reciterName(reciter) + (repeat !== 1 && !st.bsm ? ' · المرة ' + AR(st.rep) + (repeat ? ' من ' + AR(repeat) : '') : '');
+  $('#plSub').textContent = reciterName(reciter) + (st.saved ? ' · محفوظة' : '') + (repeat !== 1 && !st.bsm ? ' · المرة ' + AR(st.rep) + (repeat ? ' من ' + AR(repeat) : '') : '');
   $('#plRepeat').textContent = repeat ? 'تكرار ×' + AR(repeat) : 'تكرار ∞';
   $('#plRepeat').classList.toggle('on', repeat !== 1);
   const key = st.s + ':' + st.a;
@@ -730,8 +731,75 @@ addEventListener('keydown', e => {
   player.toggle();
 });
 $('#setReciter').innerHTML = RECITERS.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
-$('#setReciter').onchange = e => { S.setMeta('reciter', e.target.value); player.reload(); };
+$('#setReciter').onchange = e => { S.setMeta('reciter', e.target.value); player.reload(); renderAudioDl(); };
 $('#setCont').onchange = e => S.setMeta('cont', e.target.checked);
+$('#setSaveAudio').onchange = e => S.setMeta('saveAudio', e.target.checked);
+
+// ---------------- تحميل التلاوة للاستماع بدون نت ----------------
+// قايمة آيات السورة أو الجزء (ومعاهم البسملة لو فيه أول سورة) → ملفات القارئ الحالي
+function surahAyahs(s) { return Array.from({ length: SURAS[s - 1][1] }, (_, i) => [s, i + 1]); }
+function juzAyahs(j) {
+  const out = [], end = JUZ_START[j]; // أول آية في الجزء اللي بعده
+  for (let x = JUZ_START[j - 1]; x && !(end && x[0] === end[0] && x[1] === end[1]); x = nextAyah(...x)) out.push(x);
+  return out;
+}
+const ayahUrls = (list, rec) => {
+  const urls = list.map(([s, a]) => audioUrl(rec, s, a));
+  if (list.some(([s, a]) => a === 1 && s !== 1 && s !== 9)) urls.unshift(audioUrl(rec, 1, 1));
+  return urls;
+};
+
+let audioDl = null; // { cancel, btn }
+async function renderAudioDl() {
+  const s = surasOnPage(page)[0], j = juzOfPage(page), rec = audioOpts().reciter;
+  if (!audioDl) {
+    $('#dlSura').textContent = 'حمّل سورة ' + suraName(s);
+    $('#dlJuz').textContent = 'حمّل الجزء ' + JUZ_NAME[j - 1];
+  }
+  $('#dlSura').disabled = !!audioDl && audioDl.btn !== '#dlSura';
+  $('#dlJuz').disabled = !!audioDl && audioDl.btn !== '#dlJuz';
+  if (!AC.supported) { $('#audioInfo').textContent = 'المتصفح ده مش بيدعم حفظ التلاوة.'; return; }
+  const n = (await AC.counts())[rec] || 0;
+  let usage = '';
+  try { const e = await navigator.storage.estimate(); usage = ' · مساحة التطبيق كله: ' + AR(Math.round(e.usage / 1048576)) + ' ميجا'; } catch (_) {}
+  $('#audioInfo').textContent = (n ? 'محفوظ بصوت ' + reciterName(rec) + ': ' + AR(n) + ' ملف' : 'لسه مفيش تلاوات محفوظة بصوت ' + reciterName(rec)) + usage + '.';
+}
+
+async function downloadAudio(btn, list, label) {
+  if (audioDl) { if (audioDl.btn === btn) audioDl.cancel = true; return; } // الضغط تاني = إلغاء
+  if (!AC.supported) return toast('المتصفح ده مش بيدعم حفظ التلاوة');
+  const urls = ayahUrls(list, audioOpts().reciter), bar = $('#adlProg');
+  audioDl = { btn, cancel: false };
+  bar.hidden = false;
+  renderAudioDl();
+  let done = 0, ok = 0, i = 0;
+  const step = () => {
+    done++;
+    bar.firstElementChild.style.width = (done / urls.length * 100).toFixed(1) + '%';
+    $(btn).textContent = 'جاري التحميل ' + AR(Math.round(done / urls.length * 100)) + '٪ — المس للإلغاء';
+  };
+  const worker = async () => {
+    while (i < urls.length && !audioDl.cancel && !AC.blocked()) { const u = urls[i++]; if (await AC.save(u)) ok++; step(); }
+  };
+  await Promise.all(Array.from({ length: 4 }, worker));
+  const cancelled = audioDl.cancel;
+  audioDl = null;
+  bar.hidden = true;
+  if (AC.blocked()) toast('موقع التلاوة مش سامح بالتحميل على الجهاز — التلاوة هتشتغل بالإنترنت بس');
+  else if (cancelled) toast('اتلغى التحميل — اللي اتحمّل (' + AR(ok) + ' ملف) فضل محفوظ');
+  else if (ok < urls.length) toast('اتحمّل ' + AR(ok) + ' من ' + AR(urls.length) + ' — اتأكد من النت وجرّب تاني');
+  else { toast('خلص تحميل ' + label + ' ✓ — بقت تشتغل بدون نت'); S.requestPersist(); }
+  renderAudioDl();
+}
+$('#dlSura').onclick = () => { const s = surasOnPage(page)[0]; downloadAudio('#dlSura', surahAyahs(s), 'سورة ' + suraName(s)); };
+$('#dlJuz').onclick = () => { const j = juzOfPage(page); downloadAudio('#dlJuz', juzAyahs(j), 'الجزء ' + JUZ_NAME[j - 1]); };
+$('#audioClear').onclick = async () => {
+  if (audioDl) return toast('استنى التحميل يخلص أو الغيه الأول');
+  if (!confirm('تمسح كل التلاوات المحفوظة على الجهاز (لكل القرّاء)؟')) return;
+  await AC.clear();
+  toast('اتمسحت التلاوات المحفوظة');
+  renderAudioDl();
+};
 
 // ---------------- المظهر (الوضع الليلي) ----------------
 // theme: auto (حسب الجهاز) / light / dark — بيتنسخ في localStorage عشان سكريبت الـ head يطبّقه قبل أول رسم
@@ -765,6 +833,8 @@ async function renderSettings() {
   $('#setRub').value = S.meta.rubStyle || 'arch';
   $('#setReciter').value = audioOpts().reciter;
   $('#setCont').checked = audioOpts().cont;
+  $('#setSaveAudio').checked = audioOpts().save;
+  renderAudioDl();
   const persisted = await S.isPersisted();
   const n = S.marks.size;
   const last = S.meta.lastBackup ? new Date(S.meta.lastBackup).toLocaleDateString('ar-EG') : null;
