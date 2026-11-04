@@ -1,0 +1,22 @@
+# Cloudflare Pages: الواجهة من غير كاش طويل عشان التحديثات توصل، والبيانات والخطوط كاش طويل.
+# manifest.json مسموح يتقري من العنوان القديم (عشان شريط «انقل بياناتي» يعرف إن العنوان الجديد شغال).
+
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/sw.js
+  Cache-Control: no-cache
+/app.css
+  Cache-Control: no-cache
+/js/*
+  Cache-Control: no-cache
+/manifest.json
+  Cache-Control: no-cache
+  Access-Control-Allow-Origin: *
+/data/*
+  Cache-Control: public, max-age=86400
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+/icons/*
+  Cache-Control: public, max-age=604800

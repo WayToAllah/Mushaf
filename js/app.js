@@ -4,6 +4,7 @@ import { renderPage, repaint, prefetch, loadFontMap, loadFont, fontUrl } from '.
 import { loadText, search, normQuery, diffWords } from './text.js';
 import { createPlayer, RECITERS, DEFAULT_RECITER, reciterName, audioUrl, nextAyah } from './audio.js';
 import * as AC from './audio-cache.js';
+import { initMigration } from './migrate.js';
 
 // أنواع الأخطاء. لإضافة نوع جديد: سطر هنا + لون --t-<key> و .w.m-<key> في app.css.
 const TYPES = [
@@ -936,6 +937,10 @@ function hideToast() { $('#snack').classList.remove('on'); }
   await S.init();
   applyHide();
   applyTheme();
+  initMigration({
+    S, toast,
+    after: () => { applyHide(); applyTheme(); show(S.meta.lastPage || page); },
+  });
   const q = new URLSearchParams(location.search);
   const start = +q.get('p') || S.meta.lastPage || 1;
   show(start);

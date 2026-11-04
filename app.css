@@ -247,3 +247,10 @@ input,select{font-family:inherit;font-size:16px;height:44px;padding:0 12px;borde
 .listen{margin-right:auto;display:flex;align-items:center;gap:4px;height:36px;padding:0 12px 0 10px;border-radius:18px;border:0;background:var(--accent);color:var(--on-accent);font-size:13.5px;font-weight:600;flex:0 0 auto}
 .listen svg{width:16px;height:16px;fill:currentColor}
 body.playing .snack{bottom:calc(130px + var(--safe-b))}
+
+/* الانتقال للعنوان الجديد */
+.moved{display:flex;align-items:center;gap:8px;padding:8px 10px;background:color-mix(in srgb,var(--accent) 12%,var(--paper));border-bottom:1px solid var(--line);font-size:13px;line-height:1.6;color:var(--ink)}
+.moved[hidden]{display:none}
+.moved span{flex:1}
+.moved [data-go]{height:34px;padding:0 12px;border:0;border-radius:17px;background:var(--accent);color:var(--on-accent);font-size:13px;font-weight:600;flex:0 0 auto}
+.moved .x{width:30px;height:30px;border:0;background:none;color:var(--muted);font-size:20px;flex:0 0 auto}

@@ -48,6 +48,11 @@
 ## إضافة نوع خطأ جديد
 سطر في `TYPES` داخل `js/app.js`، ولون `--t-<key>` و `.w.m-<key>` في `app.css`.
 
+## النشر
+المصحف على عنوان مستقل: **https://mushaf-almuraja.pages.dev/** (Cloudflare Pages، بيتنشر تلقائيًا مع كل push على `main`).
+- إعدادات المشروع في Cloudflare: من غير build command، والـ output directory هو جذر المستودع. الكاش والـ CORS في ملف `_headers`.
+- العنوان القديم (`waytoallah.github.io/Mushaf/`) كان بيتلخبط مع تطبيق الحلقة لأنهم على نفس الدومين. لما العنوان الجديد يشتغل، القديم بيظهر شريط «انقل بياناتي» بينقل الأخطاء والمواضع والعلامات والإعدادات في رابط واحد (`js/migrate.js`).
+
 ## التشغيل محليًا
 ```
 python3 -m http.server 8000
